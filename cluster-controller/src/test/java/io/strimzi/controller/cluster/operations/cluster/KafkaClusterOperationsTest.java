@@ -9,6 +9,7 @@ import io.fabric8.kubernetes.api.model.Service;
 import io.fabric8.kubernetes.api.model.extensions.StatefulSet;
 import io.strimzi.controller.cluster.ResourceUtils;
 import io.strimzi.controller.cluster.operations.resource.ConfigMapOperations;
+import io.strimzi.controller.cluster.operations.resource.PodOperations;
 import io.strimzi.controller.cluster.operations.resource.PvcOperations;
 import io.strimzi.controller.cluster.operations.resource.ServiceOperations;
 import io.strimzi.controller.cluster.operations.resource.StatefulSetOperations;
@@ -102,6 +103,7 @@ public class KafkaClusterOperationsTest {
         ServiceOperations mockServiceOps = mock(ServiceOperations.class);
         StatefulSetOperations mockSsOps = mock(StatefulSetOperations.class);
         PvcOperations mockPvcOps = mock(PvcOperations.class);
+        PodOperations mockPodOps = mock(PodOperations.class);
 
         // Create a CM
         String clusterCmName = clusterCm.getMetadata().getName();
@@ -121,7 +123,7 @@ public class KafkaClusterOperationsTest {
         KafkaClusterOperations ops = new KafkaClusterOperations(vertx, openShift,
                 mockCmOps,
                 mockServiceOps, mockSsOps,
-                mockPvcOps);
+                mockPvcOps, mockPodOps);
 
         // Now try to create a KafkaCluster based on this CM
         Async async = context.async();
