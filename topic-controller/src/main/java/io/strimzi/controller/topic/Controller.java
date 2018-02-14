@@ -384,37 +384,7 @@ public class Controller {
             LOGGER.info("Reconciling topic {}, k8sTopic:{}, kafkaTopic:{}, privateTopic:{}", topicName, k8sTopic == null ? "null" : "nonnull", kafkaTopic == null ? "null" : "nonnull", privateTopic == null ? "null" : "nonnull");
         }
         if (privateTopic == null) {
-            if (k8sTopic == null) {
-                if (kafkaTopic == null) {
-                    // All three null: This happens reentrantly when a topic or configmap is deleted
-                    LOGGER.debug("All three topics null during reconciliation.");
-                    reconciliationResultHandler.handle(Future.succeededFuture());
-                } else {
-                    // it's been created in Kafka => create in k8s and privateState
-                    LOGGER.debug("topic created in kafka, will create cm in k8s and topicStore");
-                    enqueue(new CreateConfigMap(kafkaTopic, ar -> {
-                        // In all cases, create in privateState
-                        if (ar.succeeded()) {
-                            enqueue(new CreateInTopicStore(kafkaTopic, involvedObject, reconciliationResultHandler));
-                        } else {
-                            reconciliationResultHandler.handle(ar);
-                        }
-                    }));
-                }
-            } else if (kafkaTopic == null) {
-                // it's been created in k8s => create in Kafka and privateState
-                LOGGER.debug("cm created in k8s, will create topic in kafka and topicStore");
-                enqueue(new CreateKafkaTopic(k8sTopic, involvedObject, ar -> {
-                    // In all cases, create in privateState
-                    if (ar.succeeded()) {
-                        enqueue(new CreateInTopicStore(k8sTopic, involvedObject, reconciliationResultHandler));
-                    } else {
-                        reconciliationResultHandler.handle(ar);
-                    }
-                }));
-            } else {
-                update2Way(involvedObject, k8sTopic, kafkaTopic, reconciliationResultHandler);
-            }
+            reconcileNoPrivate(involvedObject, k8sTopic, kafkaTopic, reconciliationResultHandler);
         } else {
             if (k8sTopic == null) {
                 if (kafkaTopic == null) {
@@ -449,6 +419,40 @@ public class Controller {
                 LOGGER.debug("3 way diff");
                 update3Way(involvedObject, k8sTopic, kafkaTopic, privateTopic, reconciliationResultHandler);
             }
+        }
+    }
+
+    private void reconcileNoPrivate(HasMetadata involvedObject, Topic k8sTopic, Topic kafkaTopic, Handler<AsyncResult<Void>> reconciliationResultHandler) {
+        if (k8sTopic == null) {
+            if (kafkaTopic == null) {
+                // All three null: This happens reentrantly when a topic or configmap is deleted
+                LOGGER.debug("All three topics null during reconciliation.");
+                reconciliationResultHandler.handle(Future.succeededFuture());
+            } else {
+                // it's been created in Kafka => create in k8s and privateState
+                LOGGER.debug("topic created in kafka, will create cm in k8s and topicStore");
+                enqueue(new CreateConfigMap(kafkaTopic, ar -> {
+                    // In all cases, create in privateState
+                    if (ar.succeeded()) {
+                        enqueue(new CreateInTopicStore(kafkaTopic, involvedObject, reconciliationResultHandler));
+                    } else {
+                        reconciliationResultHandler.handle(ar);
+                    }
+                }));
+            }
+        } else if (kafkaTopic == null) {
+            // it's been created in k8s => create in Kafka and privateState
+            LOGGER.debug("cm created in k8s, will create topic in kafka and topicStore");
+            enqueue(new CreateKafkaTopic(k8sTopic, involvedObject, ar -> {
+                // In all cases, create in privateState
+                if (ar.succeeded()) {
+                    enqueue(new CreateInTopicStore(k8sTopic, involvedObject, reconciliationResultHandler));
+                } else {
+                    reconciliationResultHandler.handle(ar);
+                }
+            }));
+        } else {
+            update2Way(involvedObject, k8sTopic, kafkaTopic, reconciliationResultHandler);
         }
     }
 
@@ -545,8 +549,8 @@ public class Controller {
                     // TODO replace this with compose
                     enqueue(new UpdateConfigMap(result, ar -> {
                         Handler<Void> topicStoreHandler =
-                                ignored -> enqueue(new UpdateInTopicStore(
-                                    result, involvedObject, reconciliationResultHandler));
+                            ignored -> enqueue(new UpdateInTopicStore(
+                                result, involvedObject, reconciliationResultHandler));
                         Handler<Void> partitionsHandler;
                         if (partitionsDelta > 0) {
                             partitionsHandler = ar4 -> enqueue(new IncreaseKafkaPartitions(result, involvedObject, ar2 -> topicStoreHandler.handle(null)));

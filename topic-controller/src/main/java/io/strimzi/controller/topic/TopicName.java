@@ -62,29 +62,7 @@ class TopicName {
         if (MapName.isValidResourceName(this.name)) {
             mname = new MapName(this.name);
         } else {
-            StringBuilder n = new StringBuilder();
-            for (int i = 0; i < this.name.length(); i++) {
-                char next = i < this.name.length() - 1 ? this.name.charAt(i + 1) : '\0';
-                char ch = this.name.charAt(i);
-                if (isInRange('a', ch, 'z')
-                        || isInRange('0', ch, '9')) {
-                    n.append(ch);
-                } else if (isInRange('A', ch, 'Z')) {
-                    n.append(Character.toLowerCase(ch));
-                } else if (ch == '-' || ch == '.' || ch == '_') {
-                    // avoid hyphen next to dot in the output
-                    for (int j = n.length() - 1; j >= 0; j--) {
-                        if (isInRange('a', n.charAt(j), 'z')
-                                || isInRange('0', n.charAt(j), '9')) {
-                            n.append(ch == '_' ? '-' : ch);
-                            break;
-                        } else {
-                            break;
-                        }
-                    }
-                }
-                // only other possibiilty for ch is underscore, which is always invalid
-            }
+            StringBuilder n = transliterate();
 
             // it's still possible that n ends with a sequence of hyphens or dots
             int cut = 0;
@@ -121,6 +99,32 @@ class TopicName {
             mname = new MapName(n.toString());
         }
         return mname;
+    }
+
+    private StringBuilder transliterate() {
+        StringBuilder n = new StringBuilder();
+        for (int i = 0; i < this.name.length(); i++) {
+            char ch = this.name.charAt(i);
+            if (isInRange('a', ch, 'z')
+                    || isInRange('0', ch, '9')) {
+                n.append(ch);
+            } else if (isInRange('A', ch, 'Z')) {
+                n.append(Character.toLowerCase(ch));
+            } else if (ch == '-' || ch == '.' || ch == '_') {
+                // avoid hyphen next to dot in the output
+                for (int j = n.length() - 1; j >= 0; j--) {
+                    if (isInRange('a', n.charAt(j), 'z')
+                            || isInRange('0', n.charAt(j), '9')) {
+                        n.append(ch == '_' ? '-' : ch);
+                        break;
+                    } else {
+                        break;
+                    }
+                }
+            }
+            // only other possibility for ch is underscore, which is always invalid
+        }
+        return n;
     }
 
     private boolean isInRange(char a, char ch, char z) {
